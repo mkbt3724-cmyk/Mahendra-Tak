@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Check if the user is signed in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Check if the user owns the record
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Check if user is the admin ( mkbt3724@gmail.com )
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'mkbt3724@gmail.com';
+    }
+
+    // Games Rules: Anyone can view, only Admin can write
+    match /games/{gameId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Site Settings: Anyone can view, only Admin can write
+    match /settings/{settingsId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Blog Posts: Anyone can view, only Admin can write
+    match /blogs/{blogId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Blog Comments: Anyone can read, signed-in users can write their own
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow delete, update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    // Users Rules: Signed-in users can read/write their own profile, Admin can do all
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isOwner(userId) || isAdmin();
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Reviews Rules: Anyone can read, signed-in can create, Admin can edit/delete
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    // Leaderboard Rules: Anyone can read, signed-in can submit
+    match /leaderboard/{scoreId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // User Achievements: Signed-in can read, write if own
+    match /user_achievements/{achId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Notifications Rules: Owner can read/write, Admin can create
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userId == 'all');
+      allow create: if isAdmin();
+      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Contact Messages: Anyone can create, Admin can read/write
+    match /contacts/{msgId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // System Logs: Admin only
+    match /system_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
